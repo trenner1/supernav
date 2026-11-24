@@ -5,7 +5,7 @@ SDK ?=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
 
 build:
 	mkdir -p build/SuperNav.app/Contents/MacOS
-	swiftc -O -swift-version 5 -sdk $(SDK) main.swift -o build/SuperNav.app/Contents/MacOS/SuperNav
+	swiftc -O -swift-version 5 -sdk $(SDK) *.swift -o build/SuperNav.app/Contents/MacOS/SuperNav
 	cp Info.plist build/SuperNav.app/Contents/Info.plist
 	codesign --force --sign "$(IDENTITY)" build/SuperNav.app
 

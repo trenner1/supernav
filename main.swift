@@ -101,12 +101,17 @@ func center(of display: CGDirectDisplayID) -> CGPoint {
     return CGPoint(x: bounds.midX, y: bounds.midY)
 }
 
+func arrangedCenter(of display: CGDirectDisplayID) -> CGPoint {
+    let bounds = ScreenLayout.arrangedBounds(of: display)
+    return CGPoint(x: bounds.midX, y: bounds.midY)
+}
+
 func focusMonitor(_ direction: Direction) {
     guard let cursor = CGEvent(source: nil)?.location, let currentDisplay = display(containing: cursor) else { return }
-    let origin = center(of: currentDisplay)
+    let origin = arrangedCenter(of: currentDisplay)
     let targetDisplay = activeDisplays()
         .filter { $0 != currentDisplay }
-        .compactMap { candidate in distance(from: origin, to: center(of: candidate), going: direction).map { (candidate, $0) } }
+        .compactMap { candidate in distance(from: origin, to: arrangedCenter(of: candidate), going: direction).map { (candidate, $0) } }
         .min { $0.1 < $1.1 }?.0
     guard let targetDisplay else {
         log.notice("no monitor going \(String(describing: direction), privacy: .public)")
@@ -130,9 +135,13 @@ func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
     let code = event.getIntegerValueField(.keyboardEventKeycode)
     let modifiers = event.flags.intersection([.maskAlternate, .maskControl, .maskCommand, .maskShift])
     let leftControlHeld = event.flags.rawValue & UInt64(NX_DEVICELCTLKEYMASK) != 0
-    guard modifiers == .maskControl, leftControlHeld,
-          let direction = [Direction.up, .down].first(where: { $0.keyCode == code })
-    else { return pass }
+    let monitorKeys: [Direction]
+    switch modifiers {
+    case .maskControl: monitorKeys = [.up, .down]
+    case [.maskControl, .maskShift]: monitorKeys = [.left, .right]
+    default: monitorKeys = []
+    }
+    guard leftControlHeld, let direction = monitorKeys.first(where: { $0.keyCode == code }) else { return pass }
     if type == .keyDown, event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
         DispatchQueue.main.async { focusMonitor(direction) }
     }
@@ -141,6 +150,7 @@ func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
+let menuController = MenuController()
 let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
 if !AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary) {
     log.error("missing Accessibility access")

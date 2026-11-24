@@ -52,7 +52,7 @@ This builds `~/Applications/SuperNav.app` and adds a LaunchAgent so it starts at
 
 ## First launch
 
-1. **Open it.** SuperNav isn't notarized by Apple, so macOS blocks the first launch. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to SuperNav.
+1. **Open it.** Release downloads from version 1.0.1 are Developer ID signed and notarized by Apple. Open SuperNav normally.
 2. **Grant Accessibility.** SuperNav needs it to read keys and focus windows. Turn it on under **System Settings → Privacy & Security → Accessibility**. It starts working within a couple of seconds, with no restart needed.
 3. **Start at login** (Homebrew and download installs). Add SuperNav under **System Settings → General → Login Items**.
 
@@ -77,3 +77,49 @@ brew uninstall --cask supernav
 ```
 
 For a source install, run `make uninstall` from the repo instead.
+
+## Signed and notarized releases
+
+Release builds require Xcode command-line tools, a paid Apple Developer Program
+membership, and a **Developer ID Application** identity (certificate plus private
+key) in your keychain. Check existing identities before creating another:
+
+```sh
+security find-identity -v -p codesigning
+```
+
+In Xcode, use Settings → Accounts → your team → Manage Certificates to create or
+manage the identity. If Xcode reports an Account Holder role error, create the
+certificate at https://developer.apple.com/account/resources/certificates/list
+using a CSR from Keychain Access → Certificate Assistant → Request a Certificate
+From a Certificate Authority, then import the downloaded certificate on the same
+Mac. Existing certificates need their original private key; a
+`.cer` download alone cannot restore that key. Import a backed-up `.p12` or use
+the Mac where the identity was created when applicable. Keep default certificate
+trust settings.
+
+Store notarization credentials once in Keychain. Run this interactively, supplying
+your Apple account, Developer Team ID, and an app-specific password when prompted:
+
+```sh
+xcrun notarytool store-credentials supernav-notary
+```
+
+Create an app-specific password at https://account.apple.com. Do not put passwords,
+private keys, or certificate exports in this repository.
+
+```sh
+make release RELEASE_IDENTITY='Developer ID Application: Your Name (TEAMID)'
+```
+
+The release command builds a universal app, signs with hardened runtime and a
+secure timestamp, submits it to Apple, waits for acceptance, staples and validates
+the ticket, checks Gatekeeper, and then creates `build/release/SuperNav.zip`.
+`NOTARY_PROFILE` can override the default Keychain profile. Submission results are
+saved in `build/release/notarization.json`; for rejected submissions, use the ID
+there with `xcrun notarytool log ID --keychain-profile supernav-notary`.
+
+Upload only the final `SuperNav.zip` to a new GitHub release, then update the
+Homebrew cask version, URL, and SHA-256 with the hash printed by the command.
+Older releases before 1.0.1 are unnotarized. Accessibility permission is still
+required for all versions.

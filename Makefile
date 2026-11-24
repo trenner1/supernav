@@ -1,7 +1,9 @@
 APP := $(HOME)/Applications/SuperNav.app
 AGENT := $(HOME)/Library/LaunchAgents/local.supernav.plist
 IDENTITY ?= SuperNav Signing
-SDK ?=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
+SDK ?= $(shell xcrun --sdk macosx --show-sdk-path)
+NOTARY_PROFILE ?= supernav-notary
+RELEASE_IDENTITY ?=
 
 build:
 	mkdir -p build/SuperNav.app/Contents/MacOS
@@ -19,15 +21,7 @@ install: build
 	launchctl bootstrap gui/$$(id -u) $(AGENT)
 
 release:
-	rm -rf build/release
-	mkdir -p build/release/SuperNav.app/Contents/MacOS
-	for arch in arm64 x86_64; do \
-		swiftc -O -swift-version 5 -sdk $(SDK) -target $$arch-apple-macos14 *.swift -o build/release/$$arch || exit 1; \
-	done
-	lipo -create -output build/release/SuperNav.app/Contents/MacOS/SuperNav build/release/arm64 build/release/x86_64
-	cp Info.plist build/release/SuperNav.app/Contents/Info.plist
-	codesign --force --sign "$(IDENTITY)" build/release/SuperNav.app
-	cd build/release && ditto -c -k --keepParent SuperNav.app SuperNav.zip
+	@RELEASE_IDENTITY="$(RELEASE_IDENTITY)" NOTARY_PROFILE="$(NOTARY_PROFILE)" SDK="$(SDK)" ./scripts/release.sh
 
 uninstall:
 	-launchctl bootout gui/$$(id -u) $(AGENT)

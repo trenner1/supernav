@@ -1,0 +1,141 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag (must match Info.plist)
+        required: true
+        type: string
+      verify_only:
+        description: Sign and notarize without publishing or updating Homebrew
+        default: true
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: supernav-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      NOTARY_PROFILE: supernav-ci
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
+      - name: Validate version and credentials
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          TAP_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)
+          test "$RELEASE_TAG" = "v$version"
+          for name in CERTIFICATE CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID TAP_KEY; do
+            if [[ -z "${!name}" ]]; then echo "Missing configuration: $name" >&2; exit 1; fi
+          done
+      - name: Import signing identity and notarization credentials
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/supernav-signing.keychain-db"
+          password=$(openssl rand -hex 32)
+          echo "::add-mask::$password"
+          printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/signing.p12" -P "$CERTIFICATE_PASSWORD" -k "$keychain" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
+          curl --fail --silent --show-error --location https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer -o "$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$keychain"
+          identity=$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p')
+          test -n "$identity"
+          test "$(printf '%s\n' "$identity" | wc -l | tr -d ' ')" = 1
+          [[ "$identity" == *"($APPLE_TEAM_ID)" ]]
+          echo "RELEASE_IDENTITY=$identity" >> "$GITHUB_ENV"
+          xcrun notarytool store-credentials "$NOTARY_PROFILE" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_PASSWORD" --keychain "$keychain"
+          rm -f "$RUNNER_TEMP/signing.p12"
+      - name: Build, sign, notarize, and verify
+        run: make release
+      - name: Retain verified build and notarization result
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: SuperNav-${{ env.RELEASE_TAG }}-${{ github.run_attempt }}
+          path: |
+            build/release/SuperNav.zip
+            build/release/notarization.json
+            build/release/signature.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish release without replacing existing assets
+        if: github.event_name == 'push' || !inputs.verify_only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Reruns reuse a published artifact; they never invalidate Homebrew's checksum.
+          if gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft > "$RUNNER_TEMP/is-draft"; then
+            test "$(cat "$RUNNER_TEMP/is-draft")" = false
+          else
+            gh release create "$RELEASE_TAG" build/release/SuperNav.zip --verify-tag \
+              --title "SuperNav ${RELEASE_TAG#v}" --generate-notes \
+              --notes 'Developer ID signed and notarized by Apple. Open normally, then grant Accessibility permission in System Settings. Universal app for Apple silicon and Intel; macOS 14+.'
+          fi
+          mkdir -p "$RUNNER_TEMP/published"
+          gh release download "$RELEASE_TAG" --pattern SuperNav.zip --dir "$RUNNER_TEMP/published"
+          ditto -x -k "$RUNNER_TEMP/published/SuperNav.zip" "$RUNNER_TEMP/published"
+          codesign --verify --strict "$RUNNER_TEMP/published/SuperNav.app"
+          xcrun stapler validate "$RUNNER_TEMP/published/SuperNav.app"
+          spctl --assess --type execute "$RUNNER_TEMP/published/SuperNav.app"
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$RUNNER_TEMP/published/SuperNav.app/Contents/Info.plist")
+          test "v$version" = "$RELEASE_TAG"
+      - name: Update Homebrew cask
+        if: github.event_name == 'push' || !inputs.verify_only
+        env:
+          TAP_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$RUNNER_TEMP/tap-ssh"
+          printf '%s\n' "$TAP_KEY" > "$RUNNER_TEMP/tap-ssh/key"
+          chmod 600 "$RUNNER_TEMP/tap-ssh/key"
+          gh api meta --jq '.ssh_keys[] | "github.com " + .' > "$RUNNER_TEMP/tap-ssh/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/tap-ssh/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUNNER_TEMP/tap-ssh/known_hosts"
+          git clone git@github.com:trenner1/homebrew-tap.git "$RUNNER_TEMP/tap"
+          python3 scripts/update-cask.py "$RUNNER_TEMP/tap/Casks/supernav.rb" "${RELEASE_TAG#v}" "$RUNNER_TEMP/published/SuperNav.zip"
+          cd "$RUNNER_TEMP/tap"
+          ruby -c Casks/supernav.rb
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Casks/supernav.rb
+          if ! git diff --cached --quiet; then
+            git commit -m "Update SuperNav to ${RELEASE_TAG#v}"
+            git push origin HEAD:main
+          fi
+      - name: Remove temporary credentials
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/supernav-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/signing.p12"
+          rm -rf "$RUNNER_TEMP/tap-ssh"

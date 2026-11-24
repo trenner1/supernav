@@ -4,6 +4,8 @@
 <dict>
     <key>CFBundleIdentifier</key>
     <string>local.supernav</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleName</key>
     <string>SuperNav</string>
     <key>CFBundleExecutable</key>

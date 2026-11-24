@@ -6,9 +6,11 @@ NOTARY_PROFILE ?= supernav-notary
 RELEASE_IDENTITY ?=
 
 build:
-	mkdir -p build/SuperNav.app/Contents/MacOS
+	./scripts/build-icon.sh
+	mkdir -p build/SuperNav.app/Contents/MacOS build/SuperNav.app/Contents/Resources
 	swiftc -O -swift-version 5 -sdk $(SDK) *.swift -o build/SuperNav.app/Contents/MacOS/SuperNav
 	cp Info.plist build/SuperNav.app/Contents/Info.plist
+	cp build/AppIcon.icns build/SuperNav.app/Contents/Resources/AppIcon.icns
 	codesign --force --sign "$(IDENTITY)" build/SuperNav.app
 
 install: build

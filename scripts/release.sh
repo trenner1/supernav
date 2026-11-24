@@ -10,7 +10,9 @@ app="$out/SuperNav.app"
 rm -rf "$out"
 # Validate credentials before rebuilding. No passwords are stored in the repo.
 xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null
-mkdir -p "$app/Contents/MacOS"
+./scripts/build-icon.sh
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+cp build/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
 for arch in arm64 x86_64; do
     xcrun swiftc -O -swift-version 5 -sdk "$SDK" -target "$arch-apple-macos14" \
         ./*.swift -o "$out/$arch"

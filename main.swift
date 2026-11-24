@@ -129,19 +129,14 @@ func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
     }
     let code = event.getIntegerValueField(.keyboardEventKeycode)
     let modifiers = event.flags.intersection([.maskAlternate, .maskControl, .maskCommand, .maskShift])
-    guard modifiers == .maskAlternate, let direction = Direction.allCases.first(where: { $0.keyCode == code }) else {
-        return pass
+    let leftControlHeld = event.flags.rawValue & UInt64(NX_DEVICELCTLKEYMASK) != 0
+    guard modifiers == .maskControl, leftControlHeld,
+          let direction = [Direction.up, .down].first(where: { $0.keyCode == code })
+    else { return pass }
+    if type == .keyDown, event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
+        DispatchQueue.main.async { focusMonitor(direction) }
     }
-    switch direction {
-    case .left, .right:
-        event.flags = event.flags.subtracting(.maskAlternate).union(.maskControl)
-        return pass
-    case .up, .down:
-        if type == .keyDown, event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
-            DispatchQueue.main.async { focusMonitor(direction) }
-        }
-        return nil
-    }
+    return nil
 }
 
 let app = NSApplication.shared

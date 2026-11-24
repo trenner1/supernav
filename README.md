@@ -2,8 +2,10 @@
 
 Pop!_OS-style keyboard navigation for macOS.
 
-- **Option+← / →** switches workspace (Space) on the current monitor
-- **Option+↑ / ↓** jumps to the monitor above or below, moves the cursor there and focuses its top window
+- **Left Control+↑ / ↓** jumps to the monitor above or below, moves the cursor there and focuses its top window
+- **Control+← / →** switches workspace (Space) on the monitor under the cursor; this is macOS's own Mission Control shortcut
+
+Right Control+↑ / ↓ still opens Mission Control and App Exposé.
 
 ## Install
 

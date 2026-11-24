@@ -29,8 +29,12 @@ Right Control is left alone, so <kbd>⌃ right</kbd> <kbd>↑</kbd> / <kbd>↓</
 ### Homebrew
 
 ```sh
-brew install --cask trenner1/tap/supernav
+brew tap trenner1/tap
+brew trust trenner1/tap
+brew install --cask supernav
 ```
+
+Homebrew only installs from taps you've trusted, which is what `brew trust` does.
 
 ### Download
 

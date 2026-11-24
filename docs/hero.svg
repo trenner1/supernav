@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 380" width="1200" height="380" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1226"/>
+      <stop offset="0.55" stop-color="#1b1640"/>
+      <stop offset="1" stop-color="#0b2a3a"/>
+    </linearGradient>
+    <linearGradient id="screenA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#48b0f7"/>
+      <stop offset="1" stop-color="#7b5cff"/>
+    </linearGradient>
+    <linearGradient id="screenB" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2fd6a7"/>
+      <stop offset="1" stop-color="#1c8fd6"/>
+    </linearGradient>
+    <linearGradient id="screenC" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff9f5a"/>
+      <stop offset="1" stop-color="#ff5c8a"/>
+    </linearGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#a9c8ff"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity="0.04"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#ffffff" fill-opacity="0.85"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="380" rx="24" fill="url(#bg)"/>
+  <rect width="1200" height="380" rx="24" fill="url(#grid)"/>
+  <circle cx="930" cy="190" r="170" fill="#7b5cff" fill-opacity="0.12" filter="url(#glow)"/>
+
+  <text x="72" y="150" font-size="76" font-weight="800" fill="url(#title)" letter-spacing="-2">SuperNav</text>
+  <text x="74" y="200" font-size="26" fill="#c9d3ff" fill-opacity="0.9">Pop!_OS-style keyboard navigation for macOS</text>
+  <text x="74" y="236" font-size="20" fill="#c9d3ff" fill-opacity="0.6">Jump between monitors and workspaces without touching the mouse.</text>
+
+  <g transform="translate(74 270)" font-size="20" font-weight="600" fill="#ffffff">
+    <rect width="64" height="48" rx="10" fill="#ffffff" fill-opacity="0.1" stroke="#ffffff" stroke-opacity="0.25"/>
+    <text x="32" y="31" text-anchor="middle">⌃</text>
+    <rect x="76" width="48" height="48" rx="10" fill="#ffffff" fill-opacity="0.1" stroke="#ffffff" stroke-opacity="0.25"/>
+    <text x="100" y="31" text-anchor="middle">↑</text>
+    <rect x="132" width="48" height="48" rx="10" fill="#ffffff" fill-opacity="0.1" stroke="#ffffff" stroke-opacity="0.25"/>
+    <text x="156" y="31" text-anchor="middle">↓</text>
+    <rect x="188" width="48" height="48" rx="10" fill="#ffffff" fill-opacity="0.1" stroke="#ffffff" stroke-opacity="0.25"/>
+    <text x="212" y="31" text-anchor="middle">←</text>
+    <rect x="244" width="48" height="48" rx="10" fill="#ffffff" fill-opacity="0.1" stroke="#ffffff" stroke-opacity="0.25"/>
+    <text x="268" y="31" text-anchor="middle">→</text>
+  </g>
+
+  <g transform="translate(750 26)">
+    <g filter="url(#glow)">
+      <rect x="40" y="0" width="230" height="130" rx="12" fill="url(#screenA)"/>
+    </g>
+    <rect x="40" y="0" width="230" height="130" rx="12" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="2"/>
+    <rect x="56" y="16" width="106" height="64" rx="6" fill="#ffffff" fill-opacity="0.25"/>
+    <rect x="172" y="16" width="82" height="98" rx="6" fill="#ffffff" fill-opacity="0.18"/>
+
+    <rect x="20" y="190" width="240" height="134" rx="12" fill="url(#screenB)"/>
+    <rect x="20" y="190" width="240" height="134" rx="12" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="2"/>
+    <rect x="36" y="206" width="208" height="66" rx="6" fill="#ffffff" fill-opacity="0.22"/>
+
+    <rect x="320" y="180" width="110" height="150" rx="12" fill="url(#screenC)" fill-opacity="0.9"/>
+    <rect x="320" y="180" width="110" height="150" rx="12" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="2"/>
+    <rect x="333" y="194" width="84" height="56" rx="6" fill="#ffffff" fill-opacity="0.22"/>
+
+    <path d="M150 140 V 180" stroke="#ffffff" stroke-width="3" stroke-opacity="0.85" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+    <path d="M268 257 H 312" stroke="#ffffff" stroke-width="3" stroke-opacity="0.85" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  </g>
+</svg>

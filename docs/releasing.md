@@ -101,3 +101,15 @@ git push origin v1.0.2
 Signing certificates and Apple app-specific passwords need replacement if they
 expire or are revoked. Publishing the current icon requires a new release; the
 already-published 1.0.1 ZIP is left intact.
+
+New CI releases include a GitHub build attestation for the final notarized ZIP.
+Download that ZIP and verify its provenance with:
+
+```sh
+gh attestation verify SuperNav.zip --repo trenner1/supernav
+```
+
+For manual publishing of a new release, select the release tag as the workflow
+ref so the run and build use the same source commit. A verification run against
+an older tag can still check signing and notarization. The workflow skips
+attestation when the checked-out source differs from the workflow run's commit.

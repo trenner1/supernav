@@ -23,6 +23,8 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       NOTARY_PROFILE: supernav-ci
@@ -77,6 +79,18 @@ jobs:
           rm -f "$RUNNER_TEMP/signing.p12"
       - name: Build, sign, notarize, and verify
         run: make release
+      - name: Check provenance source
+        id: provenance
+        run: |
+          if [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]; then
+            echo "matches=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Attest final release ZIP
+        id: attest
+        if: steps.provenance.outputs.matches == 'true'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: build/release/SuperNav.zip
       - name: Retain verified build and notarization result
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -91,12 +105,17 @@ jobs:
         if: github.event_name == 'push' || !inputs.verify_only
         env:
           GH_TOKEN: ${{ github.token }}
+          ATTESTATION_OUTCOME: ${{ steps.attest.outcome }}
         run: |
           set -euo pipefail
           # Reruns reuse a published artifact; they never invalidate Homebrew's checksum.
           if gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft > "$RUNNER_TEMP/is-draft"; then
             test "$(cat "$RUNNER_TEMP/is-draft")" = false
           else
+            if [[ "$ATTESTATION_OUTCOME" != success ]]; then
+              echo "Creating a release requires provenance for the checked-out tag. Run the workflow from that tag." >&2
+              exit 1
+            fi
             gh release create "$RELEASE_TAG" build/release/SuperNav.zip --verify-tag \
               --title "SuperNav ${RELEASE_TAG#v}" --generate-notes \
               --notes 'Developer ID signed and notarized by Apple. Open normally, then grant Accessibility permission in System Settings. Universal app for Apple silicon and Intel; macOS 14+.'

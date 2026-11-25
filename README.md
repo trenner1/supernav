@@ -77,3 +77,7 @@ brew uninstall --cask supernav
 ```
 
 For a source install, run `make uninstall` from the repo instead.
+
+## License
+
+SuperNav is available under the [MIT License](LICENSE).

@@ -191,7 +191,8 @@ command -v gh >/dev/null || { echo "Install GitHub CLI first." >&2; exit 1; }
 gh auth status >/dev/null
 banner "SuperNav: one-time Actions credentials"
 stage "Export the Developer ID identity"
-say "Open Keychain Access → login → My Certificates."
+say "Reuse your existing .p12 export; you do not need to export again."
+say "If you need a new export: Keychain Access → login → My Certificates."
 step "Select Developer ID Application: Trevor Renner (S2VU23LBW8)."
 step "File → Export Items… → Personal Information Exchange (.p12)."
 step "Set an export password; allow the export with your Mac password if asked."
@@ -200,13 +201,9 @@ ask P12_PATH "Full path to the exported .p12 (no quotes):"
 ask_secret P12_PASSWORD "Export password:"
 [[ -n "$P12_PASSWORD" ]] || { echo "Use a nonempty export password." >&2; exit 1; }
 export P12_PASSWORD
-# Keychain Access exports can use RC2-40-CBC. OpenSSL 3 needs its legacy
-# provider to read those files; Apple's bundled LibreSSL reads them directly.
-if [[ "$(openssl version)" == OpenSSL\ 3.* ]]; then
-  openssl pkcs12 -legacy -in "$P12_PATH" -passin env:P12_PASSWORD -noout >/dev/null
-else
-  openssl pkcs12 -in "$P12_PATH" -passin env:P12_PASSWORD -noout >/dev/null
-fi
+# Use Apple's bundled implementation: PATH may select OpenSSL 3 or 4,
+# which reject Keychain Access's legacy RC2 encryption by default.
+/usr/bin/openssl pkcs12 -in "$P12_PATH" -passin env:P12_PASSWORD -noout >/dev/null
 set_secret APPLE_CERTIFICATE_P12_BASE64 "$(base64 < "$P12_PATH" | tr -d '\n')"
 set_secret APPLE_CERTIFICATE_PASSWORD "$P12_PASSWORD"
 unset P12_PASSWORD

@@ -28,6 +28,20 @@ struct Window {
     var center: CGPoint { CGPoint(x: frame.midX, y: frame.midY) }
 }
 
+struct MonitorVisit {
+    let displayID: CGDirectDisplayID
+    let focusedWindow: Window?
+
+    func canReturn(from currentDisplay: CGDirectDisplayID, active: [CGDirectDisplayID]) -> Bool {
+        displayID != currentDisplay && active.contains(displayID)
+    }
+
+    func preferredWindow(in windows: [Window]) -> Window? {
+        guard let focusedWindow else { return nil }
+        return windows.first { $0.id == focusedWindow.id && $0.pid == focusedWindow.pid }
+    }
+}
+
 func visibleWindows() -> [Window] {
     let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
     guard let entries = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else { return [] }
@@ -77,16 +91,17 @@ func distance(from origin: CGPoint, to target: CGPoint, going direction: Directi
     return along + 2 * abs(across)
 }
 
-func focus(_ window: Window) {
+func focus(_ window: Window) -> Bool {
     guard let element = axWindows(of: window.pid).first(where: { windowID(of: $0) == window.id }) else {
         log.error("no accessibility window for \(window.id, privacy: .public) in pid \(window.pid, privacy: .public)")
-        return
+        return false
     }
     let app = AXUIElementCreateApplication(window.pid)
     let frontmost = AXUIElementSetAttributeValue(app, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
     let main = AXUIElementSetAttributeValue(element, kAXMainAttribute as CFString, kCFBooleanTrue)
     let raise = AXUIElementPerformAction(element, kAXRaiseAction as CFString)
     log.notice("focus \(window.id, privacy: .public): frontmost \(frontmost.rawValue, privacy: .public) main \(main.rawValue, privacy: .public) raise \(raise.rawValue, privacy: .public)")
+    return frontmost == .success && (main == .success || raise == .success)
 }
 
 func activeDisplays() -> [CGDirectDisplayID] {
@@ -106,8 +121,54 @@ func arrangedCenter(of display: CGDirectDisplayID) -> CGPoint {
     return CGPoint(x: bounds.midX, y: bounds.midY)
 }
 
+func currentMonitor() -> CGDirectDisplayID? {
+    guard let cursor = CGEvent(source: nil)?.location else { return nil }
+    return display(containing: cursor)
+}
+
+func focusedWindow(on monitor: CGDirectDisplayID, in windows: [Window]) -> Window? {
+    guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return nil }
+    var value: CFTypeRef?
+    let app = AXUIElementCreateApplication(pid)
+    guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &value) == .success,
+          let value, CFGetTypeID(value) == AXUIElementGetTypeID()
+    else { return nil }
+    let element = value as! AXUIElement
+    guard let id = windowID(of: element) else { return nil }
+    return windows.first {
+        $0.id == id && $0.pid == pid && display(containing: $0.center) == monitor
+    }
+}
+
+var previousVisit: MonitorVisit?
+
+func jump(from source: CGDirectDisplayID, to destination: MonitorVisit) {
+    let windows = visibleWindows()
+    let origin = MonitorVisit(displayID: source, focusedWindow: focusedWindow(on: source, in: windows))
+    guard CGWarpMouseCursorPosition(center(of: destination.displayID)) == .success else { return }
+    CGAssociateMouseAndMouseCursorPosition(1)
+    previousVisit = origin
+
+    let candidates = windows.filter { display(containing: $0.center) == destination.displayID }
+    if let preferred = destination.preferredWindow(in: candidates) {
+        if focus(preferred) { return }
+        if let fallback = candidates.first(where: { $0.id != preferred.id }) {
+            _ = focus(fallback)
+        }
+    } else if let frontmost = candidates.first {
+        _ = focus(frontmost)
+    }
+}
+
+func jumpBack() {
+    guard let current = currentMonitor(), let previousVisit,
+          previousVisit.canReturn(from: current, active: activeDisplays())
+    else { return }
+    jump(from: current, to: previousVisit)
+}
+
 func focusMonitor(_ direction: Direction) {
-    guard let cursor = CGEvent(source: nil)?.location, let currentDisplay = display(containing: cursor) else { return }
+    guard let currentDisplay = currentMonitor() else { return }
     let origin = arrangedCenter(of: currentDisplay)
     let targetDisplay = activeDisplays()
         .filter { $0 != currentDisplay }
@@ -117,24 +178,37 @@ func focusMonitor(_ direction: Direction) {
         log.notice("no monitor going \(String(describing: direction), privacy: .public)")
         return
     }
-    CGWarpMouseCursorPosition(center(of: targetDisplay))
-    CGAssociateMouseAndMouseCursorPosition(1)
-    if let window = visibleWindows().first(where: { display(containing: $0.center) == targetDisplay }) {
-        focus(window)
-    }
+    jump(from: currentDisplay, to: MonitorVisit(displayID: targetDisplay, focusedWindow: nil))
 }
 
 var tap: CFMachPort?
+var jumpBackKeyIsDown = false
 
 func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
     let pass = Unmanaged.passUnretained(event)
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        jumpBackKeyIsDown = false
         if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
         return pass
     }
     let code = event.getIntegerValueField(.keyboardEventKeycode)
     let modifiers = event.flags.intersection([.maskAlternate, .maskControl, .maskCommand, .maskShift])
     let leftControlHeld = event.flags.rawValue & UInt64(NX_DEVICELCTLKEYMASK) != 0
+    if code == Int64(kVK_Space) {
+        if type == .keyUp, jumpBackKeyIsDown {
+            jumpBackKeyIsDown = false
+            return nil
+        }
+        if type == .keyDown {
+            if jumpBackKeyIsDown { return nil }
+            if leftControlHeld, modifiers == [.maskControl, .maskShift],
+               event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
+                jumpBackKeyIsDown = true
+                DispatchQueue.main.async { jumpBack() }
+                return nil
+            }
+        }
+    }
     let monitorKeys: [Direction]
     switch modifiers {
     case .maskControl: monitorKeys = [.up, .down]

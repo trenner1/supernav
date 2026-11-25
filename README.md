@@ -20,7 +20,10 @@ SuperNav brings the Pop!_OS habit of hopping around your desk with the keyboard 
 | --- | --- |
 | <kbd>⌃ left</kbd> <kbd>↑</kbd> / <kbd>↓</kbd> | Jump to the monitor above or below |
 | <kbd>⌃ left</kbd> <kbd>⇧</kbd> <kbd>←</kbd> / <kbd>→</kbd> | Jump to the monitor on the left or right |
+| <kbd>⌃ left</kbd> <kbd>⇧</kbd> <kbd>Space</kbd> | Jump back to the previous monitor and window |
 | <kbd>⌃</kbd> <kbd>←</kbd> / <kbd>→</kbd> | Switch workspace on the current monitor (built into macOS) |
+
+Jump Back remembers the monitor and focused window you left on a SuperNav jump. Press it again to toggle back. If the old window is unavailable, SuperNav focuses the frontmost window on that monitor. If the monitor is disconnected, the shortcut does nothing.
 
 Right Control is left alone, so <kbd>⌃ right</kbd> <kbd>↑</kbd> / <kbd>↓</kbd> still opens Mission Control and App Exposé.
 

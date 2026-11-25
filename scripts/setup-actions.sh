@@ -200,7 +200,13 @@ ask P12_PATH "Full path to the exported .p12 (no quotes):"
 ask_secret P12_PASSWORD "Export password:"
 [[ -n "$P12_PASSWORD" ]] || { echo "Use a nonempty export password." >&2; exit 1; }
 export P12_PASSWORD
-openssl pkcs12 -in "$P12_PATH" -passin env:P12_PASSWORD -noout >/dev/null
+# Keychain Access exports can use RC2-40-CBC. OpenSSL 3 needs its legacy
+# provider to read those files; Apple's bundled LibreSSL reads them directly.
+if [[ "$(openssl version)" == OpenSSL\ 3.* ]]; then
+  openssl pkcs12 -legacy -in "$P12_PATH" -passin env:P12_PASSWORD -noout >/dev/null
+else
+  openssl pkcs12 -in "$P12_PATH" -passin env:P12_PASSWORD -noout >/dev/null
+fi
 set_secret APPLE_CERTIFICATE_P12_BASE64 "$(base64 < "$P12_PATH" | tr -d '\n')"
 set_secret APPLE_CERTIFICATE_PASSWORD "$P12_PASSWORD"
 unset P12_PASSWORD

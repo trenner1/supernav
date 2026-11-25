@@ -12,7 +12,7 @@ rm -rf "$out"
 xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null
 ./scripts/build-icon.sh
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-cp build/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
+cp build/AppIcon.icns LICENSE "$app/Contents/Resources/"
 for arch in arm64 x86_64; do
     xcrun swiftc -O -swift-version 5 -sdk "$SDK" -target "$arch-apple-macos14" \
         ./*.swift -o "$out/$arch"

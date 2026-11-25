@@ -10,7 +10,7 @@ build:
 	mkdir -p build/SuperNav.app/Contents/MacOS build/SuperNav.app/Contents/Resources
 	swiftc -O -swift-version 5 -sdk $(SDK) *.swift -o build/SuperNav.app/Contents/MacOS/SuperNav
 	cp Info.plist build/SuperNav.app/Contents/Info.plist
-	cp build/AppIcon.icns build/SuperNav.app/Contents/Resources/AppIcon.icns
+	cp build/AppIcon.icns LICENSE build/SuperNav.app/Contents/Resources/
 	codesign --force --sign "$(IDENTITY)" build/SuperNav.app
 
 install: build

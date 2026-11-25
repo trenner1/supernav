@@ -91,7 +91,8 @@ func distance(from origin: CGPoint, to target: CGPoint, going direction: Directi
     return along + 2 * abs(across)
 }
 
-func focus(_ window: Window) -> Bool {
+// Returns whether the AX window was found and a focus request was issued.
+func requestFocus(_ window: Window) -> Bool {
     guard let element = axWindows(of: window.pid).first(where: { windowID(of: $0) == window.id }) else {
         log.error("no accessibility window for \(window.id, privacy: .public) in pid \(window.pid, privacy: .public)")
         return false
@@ -101,7 +102,9 @@ func focus(_ window: Window) -> Bool {
     let main = AXUIElementSetAttributeValue(element, kAXMainAttribute as CFString, kCFBooleanTrue)
     let raise = AXUIElementPerformAction(element, kAXRaiseAction as CFString)
     log.notice("focus \(window.id, privacy: .public): frontmost \(frontmost.rawValue, privacy: .public) main \(main.rawValue, privacy: .public) raise \(raise.rawValue, privacy: .public)")
-    return frontmost == .success && (main == .success || raise == .success)
+    // AX operations can partially succeed. Do not raise a different window
+    // after targeting the remembered one.
+    return true
 }
 
 func activeDisplays() -> [CGDirectDisplayID] {
@@ -151,12 +154,12 @@ func jump(from source: CGDirectDisplayID, to destination: MonitorVisit) {
 
     let candidates = windows.filter { display(containing: $0.center) == destination.displayID }
     if let preferred = destination.preferredWindow(in: candidates) {
-        if focus(preferred) { return }
+        if requestFocus(preferred) { return }
         if let fallback = candidates.first(where: { $0.id != preferred.id }) {
-            _ = focus(fallback)
+            _ = requestFocus(fallback)
         }
     } else if let frontmost = candidates.first {
-        _ = focus(frontmost)
+        _ = requestFocus(frontmost)
     }
 }
 
